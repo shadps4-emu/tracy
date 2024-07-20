@@ -1,14 +1,11 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Run version helper script
-include(version.cmake)
-
-set(TRACY_VERSION_MAJOR ${major})
-set(TRACY_VERSION_MINOR ${minor})
-set(TRACY_VERSION_PATCH ${patch})
-set(TRACY_VERSION_STRING "${TRACY_VERSION_MAJOR}.${TRACY_VERSION_MINOR}.${TRACY_VERSION_PATCH}")
+include(cmake/version.cmake)
 
 project(Tracy LANGUAGES CXX VERSION ${TRACY_VERSION_STRING})
+
+file(GENERATE OUTPUT .gitignore CONTENT "*")
 
 if(${BUILD_SHARED_LIBS})
 	set(DEFAULT_STATIC OFF)
@@ -64,7 +61,7 @@ endmacro()
 
 set_option(TRACY_ENABLE "Enable profiling" ON)
 set_option(TRACY_ON_DEMAND "On-demand profiling" OFF)
-set_option(TRACY_CALLSTACK "Enfore callstack collection for tracy regions" OFF)
+set_option(TRACY_CALLSTACK "Enforce callstack collection for tracy regions" OFF)
 set_option(TRACY_NO_CALLSTACK "Disable all callstack related functionality" OFF)
 set_option(TRACY_NO_CALLSTACK_INLINES "Disables the inline functions in callstacks" OFF)
 set_option(TRACY_ONLY_LOCALHOST "Only listen on the localhost interface" OFF)
@@ -84,6 +81,13 @@ set_option(TRACY_MANUAL_LIFETIME "Enable the manual lifetime management of the p
 set_option(TRACY_FIBERS "Enable fibers support" OFF)
 set_option(TRACY_NO_CRASH_HANDLER "Disable crash handling" OFF)
 set_option(TRACY_TIMER_FALLBACK "Use lower resolution timers" OFF)
+set_option(TRACY_LIBUNWIND_BACKTRACE "Use libunwind backtracing where supported" OFF)
+set_option(TRACY_SYMBOL_OFFLINE_RESOLVE "Instead of full runtime symbol resolution, only resolve the image path and offset to enable offline symbol resolution" OFF)
+set_option(TRACY_LIBBACKTRACE_ELF_DYNLOAD_SUPPORT "Enable libbacktrace to support dynamically loaded elfs in symbol resolution resolution after the first symbol resolve operation" OFF)
+
+# advanced
+set_option(TRACY_DEMANGLE "[advanced] Don't use default demangling function - You'll need to provide your own" OFF)
+mark_as_advanced(TRACY_DEMANGLE)
 
 if(NOT TRACY_STATIC)
     target_compile_definitions(TracyClient PRIVATE TRACY_EXPORTS)
@@ -109,6 +113,7 @@ set(client_includes
     ${TRACY_PUBLIC_DIR}/client/tracy_concurrentqueue.h
     ${TRACY_PUBLIC_DIR}/client/tracy_rpmalloc.hpp
     ${TRACY_PUBLIC_DIR}/client/tracy_SPSCQueue.h
+    ${TRACY_PUBLIC_DIR}/client/TracyKCore.hpp
     ${TRACY_PUBLIC_DIR}/client/TracyArmCpuTable.hpp
     ${TRACY_PUBLIC_DIR}/client/TracyCallstack.h
     ${TRACY_PUBLIC_DIR}/client/TracyCallstack.hpp
@@ -164,3 +169,13 @@ configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/Config.cmake.in
         INSTALL_DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/Tracy)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/TracyConfig.cmake
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/Tracy)
+
+option(TRACY_CLIENT_PYTHON "Whether to build Tracy python client library" OFF)
+
+if(TRACY_CLIENT_PYTHON)
+    if(TRACY_STATIC)
+        message(FATAL_ERROR "Python-bindings require a shared client library")
+    endif()
+
+    add_subdirectory(python)
+endif()
