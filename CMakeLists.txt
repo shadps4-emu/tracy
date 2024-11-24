@@ -38,13 +38,20 @@ target_link_libraries(
 )
 
 # Public dependency on some libraries required when using Mingw
-if(WIN32 AND ${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
+if(WIN32 AND ${CMAKE_CXX_COMPILER_ID} MATCHES "GNU|Clang")
     target_link_libraries(TracyClient PUBLIC ws2_32 dbghelp)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
     find_library(EXECINFO_LIBRARY NAMES execinfo REQUIRED)
     target_link_libraries(TracyClient PUBLIC ${EXECINFO_LIBRARY})
+endif()
+
+if(TRACY_LIBUNWIND_BACKTRACE)
+    include(FindPkgConfig)
+    pkg_check_modules(unwind REQUIRED libunwind)
+    target_include_directories(TracyClient INTERFACE ${unwind_INCLUDE_DIRS})
+    target_link_libraries(TracyClient INTERFACE ${unwind_LINK_LIBRARIES})
 endif()
 
 add_library(Tracy::TracyClient ALIAS TracyClient)
@@ -86,6 +93,8 @@ set_option(TRACY_SYMBOL_OFFLINE_RESOLVE "Instead of full runtime symbol resoluti
 set_option(TRACY_LIBBACKTRACE_ELF_DYNLOAD_SUPPORT "Enable libbacktrace to support dynamically loaded elfs in symbol resolution resolution after the first symbol resolve operation" OFF)
 
 # advanced
+set_option(TRACY_VERBOSE "[advanced] Verbose output from the profiler" OFF)
+mark_as_advanced(TRACY_VERBOSE)
 set_option(TRACY_DEMANGLE "[advanced] Don't use default demangling function - You'll need to provide your own" OFF)
 mark_as_advanced(TRACY_DEMANGLE)
 
@@ -152,7 +161,12 @@ install(TARGETS TracyClient
         EXPORT TracyConfig
         RUNTIME  DESTINATION ${CMAKE_INSTALL_BINDIR}
         LIBRARY  DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR})
+        ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        COMPONENT lib)
+# Export targets to build tree root
+export(TARGETS TracyClient
+       NAMESPACE Tracy::
+       FILE ${CMAKE_BINARY_DIR}/TracyTargets.cmake)
 install(FILES ${tracy_includes}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/tracy)
 install(FILES ${client_includes}
